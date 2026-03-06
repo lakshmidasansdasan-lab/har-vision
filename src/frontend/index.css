@@ -1,0 +1,154 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: "Mona Sans";
+  src: url("/assets/fonts/Mona-Sans.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Bricolage Grotesque";
+  src: url("/assets/fonts/BricolageGrotesque[opsz,wdth,wght].woff2") format("woff2");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/assets/fonts/GeistMono[wght].woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@layer base {
+  :root {
+    --radius: 0.5rem;
+
+    /* HAR Vision - Dark Sci-Fi Theme (always dark) */
+    --background: 0.12 0.015 250;
+    --foreground: 0.93 0.02 220;
+
+    --card: 0.15 0.02 245;
+    --card-foreground: 0.93 0.02 220;
+
+    --popover: 0.18 0.025 245;
+    --popover-foreground: 0.93 0.02 220;
+
+    /* Electric cyan primary */
+    --primary: 0.75 0.18 195;
+    --primary-foreground: 0.1 0.02 250;
+
+    --secondary: 0.2 0.025 245;
+    --secondary-foreground: 0.85 0.03 220;
+
+    --muted: 0.18 0.02 245;
+    --muted-foreground: 0.55 0.04 230;
+
+    /* Bright cyan accent */
+    --accent: 0.72 0.20 195;
+    --accent-foreground: 0.1 0.02 250;
+
+    --destructive: 0.62 0.22 22;
+    --destructive-foreground: 0.98 0.01 0;
+
+    --border: 0.25 0.04 240;
+    --input: 0.22 0.03 245;
+    --ring: 0.65 0.16 195;
+
+    /* Chart colors - activity palette */
+    --chart-1: 0.72 0.20 195;
+    --chart-2: 0.68 0.18 270;
+    --chart-3: 0.75 0.22 160;
+    --chart-4: 0.70 0.20 35;
+    --chart-5: 0.65 0.18 320;
+
+    --sidebar: 0.14 0.02 248;
+    --sidebar-foreground: 0.93 0.02 220;
+    --sidebar-primary: 0.72 0.20 195;
+    --sidebar-primary-foreground: 0.1 0.02 250;
+    --sidebar-accent: 0.18 0.025 245;
+    --sidebar-accent-foreground: 0.85 0.03 220;
+    --sidebar-border: 0.22 0.03 245;
+    --sidebar-ring: 0.65 0.16 195;
+
+    /* Custom HAR tokens */
+    --glow-cyan: 0.75 0.20 195;
+    --glow-purple: 0.65 0.18 290;
+    --grid-line: 0.20 0.03 245;
+    --surface-glass: 0.17 0.025 248;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    color-scheme: dark;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+    background-image:
+      linear-gradient(oklch(0.20 0.03 245 / 0.4) 1px, transparent 1px),
+      linear-gradient(90deg, oklch(0.20 0.03 245 / 0.4) 1px, transparent 1px);
+    background-size: 40px 40px;
+    background-attachment: fixed;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: oklch(var(--background));
+  }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(var(--border));
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(var(--ring));
+  }
+}
+
+@layer utilities {
+  .glow-cyan {
+    box-shadow: 0 0 20px oklch(0.75 0.20 195 / 0.3), 0 0 40px oklch(0.75 0.20 195 / 0.1);
+  }
+
+  .glow-cyan-text {
+    text-shadow: 0 0 20px oklch(0.75 0.20 195 / 0.6);
+  }
+
+  .glow-border-cyan {
+    border-color: oklch(0.72 0.20 195 / 0.6);
+    box-shadow: 0 0 12px oklch(0.75 0.20 195 / 0.2), inset 0 0 12px oklch(0.75 0.20 195 / 0.05);
+  }
+
+  .glass-surface {
+    background: oklch(0.17 0.025 248 / 0.8);
+    backdrop-filter: blur(12px);
+    border: 1px solid oklch(0.30 0.04 240 / 0.5);
+  }
+
+  .scan-line {
+    background: linear-gradient(
+      transparent 0%,
+      oklch(0.75 0.20 195 / 0.03) 50%,
+      transparent 100%
+    );
+    background-size: 100% 4px;
+  }
+
+  .activity-gradient {
+    background: linear-gradient(135deg, oklch(0.14 0.02 250), oklch(0.18 0.03 240));
+  }
+}
