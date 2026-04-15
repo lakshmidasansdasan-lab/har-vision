@@ -1,0 +1,65 @@
+// Version: 1.0.0
+type ActivityLabel__169396881 =
+  {
+    #bending;
+    #clapping;
+    #jumping;
+    #running;
+    #sitting;
+    #smiling;
+    #standing;
+    #stretching;
+    #walking;
+    #waving
+  };
+type ActivityResult__201498577 =
+  {
+    activityLabel : ActivityLabel__169396881;
+    analysisId : Nat;
+    confidence : Float;
+    endTime : Float;
+    id : Nat;
+    startTime : Float
+  };
+type AnalysisStatus__755239454 = {#completed; #failed; #pending; #processing};
+type Data__791452850<K, V> =
+  {var count : Nat__490723111; kvs : [var ?(K, V)]};
+type ExternalBlob__21263849 = Blob;
+type Internal__8484328<K, V> =
+  {children : [var ?Node__46230540<K, V>]; data : Data__791452850<K, V>};
+type Leaf__809889148<K, V> = {data : Data__791452850<K, V>};
+type List__415060402<T> = List__790383201<T>;
+type List__790383201<T> =
+  {
+    var blockIndex : Nat__490723111;
+    var blocks : [var [var ?T]];
+    var elementIndex : Nat__490723111
+  };
+type Nat__490723111 = Nat__920180692;
+type Nat__920180692 = Nat;
+type Node__46230540<K, V> =
+  {#internal : Internal__8484328<K, V>; #leaf : Leaf__809889148<K, V>};
+type VideoAnalysis__41284971 =
+  {
+    duration : Float;
+    fileBlob : ExternalBlob__21263849;
+    fileSize : Nat;
+    filename : Text;
+    id : Nat;
+    status : AnalysisStatus__755239454;
+    uploadDate : Int
+  };
+actor {
+  stable activityResultsMap :
+    {
+      var root :
+        Node__46230540<Nat, List__415060402<ActivityResult__201498577>>;
+      var size : Nat__490723111
+    };
+  stable var nextAnalysisId : Nat;
+  stable videoAnalyses :
+    {
+      var root : Node__46230540<Nat, VideoAnalysis__41284971>;
+      var size : Nat__490723111
+    }
+};

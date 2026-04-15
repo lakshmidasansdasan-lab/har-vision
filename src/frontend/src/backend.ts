@@ -89,15 +89,16 @@ export class ExternalBlob {
         return this;
     }
 }
-export type Time = bigint;
-export interface _CaffeineStorageRefillInformation {
-    proposed_top_up_amount?: bigint;
-}
 export interface ActivityResult {
+    id: bigint;
     startTime: number;
     activityLabel: ActivityLabel;
     endTime: number;
+    analysisId: bigint;
     confidence: number;
+}
+export interface _CaffeineStorageRefillInformation {
+    proposed_top_up_amount?: bigint;
 }
 export interface _CaffeineStorageCreateCertificateResult {
     method: string;
@@ -107,11 +108,10 @@ export interface VideoAnalysis {
     id: bigint;
     status: AnalysisStatus;
     duration: number;
-    video: ExternalBlob;
-    submittedAt: Time;
-    submittedBy: Principal;
+    fileBlob: ExternalBlob;
     fileSize: bigint;
     filename: string;
+    uploadDate: bigint;
 }
 export interface _CaffeineStorageRefillResult {
     success?: boolean;
@@ -142,15 +142,15 @@ export interface backendInterface {
     _caffeineStorageCreateCertificate(blobHash: string): Promise<_CaffeineStorageCreateCertificateResult>;
     _caffeineStorageRefillCashier(refillInformation: _CaffeineStorageRefillInformation | null): Promise<_CaffeineStorageRefillResult>;
     _caffeineStorageUpdateGatewayPrincipals(): Promise<void>;
-    deleteAnalysis(id: bigint): Promise<void>;
+    deleteAnalysis(id: bigint): Promise<boolean>;
     getActivityResults(analysisId: bigint): Promise<Array<ActivityResult>>;
-    getAllAnalyses(page: bigint, pageSize: bigint): Promise<Array<VideoAnalysis>>;
-    getAnalysis(id: bigint): Promise<VideoAnalysis>;
-    setActivityResults(analysisId: bigint, results: Array<ActivityResult>): Promise<void>;
-    submitVideo(filename: string, fileSize: bigint, duration: number, video: ExternalBlob): Promise<bigint>;
-    updateAnalysisStatus(id: bigint, status: AnalysisStatus): Promise<void>;
+    getAllAnalyses(): Promise<Array<VideoAnalysis>>;
+    getAnalysis(id: bigint): Promise<VideoAnalysis | null>;
+    setActivityResults(analysisId: bigint, results: Array<ActivityResult>): Promise<boolean>;
+    submitVideo(filename: string, fileSize: bigint, duration: number, fileBlob: ExternalBlob): Promise<bigint>;
+    updateAnalysisStatus(id: bigint, status: AnalysisStatus): Promise<boolean>;
 }
-import type { ActivityLabel as _ActivityLabel, ActivityResult as _ActivityResult, AnalysisStatus as _AnalysisStatus, ExternalBlob as _ExternalBlob, Time as _Time, VideoAnalysis as _VideoAnalysis, _CaffeineStorageRefillInformation as __CaffeineStorageRefillInformation, _CaffeineStorageRefillResult as __CaffeineStorageRefillResult } from "./declarations/backend.did.d.ts";
+import type { ActivityLabel as _ActivityLabel, ActivityResult as _ActivityResult, AnalysisStatus as _AnalysisStatus, ExternalBlob as _ExternalBlob, VideoAnalysis as _VideoAnalysis, _CaffeineStorageRefillInformation as __CaffeineStorageRefillInformation, _CaffeineStorageRefillResult as __CaffeineStorageRefillResult } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
     async _caffeineStorageBlobIsLive(arg0: Uint8Array): Promise<boolean> {
@@ -237,7 +237,7 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async deleteAnalysis(arg0: bigint): Promise<void> {
+    async deleteAnalysis(arg0: bigint): Promise<boolean> {
         if (this.processError) {
             try {
                 const result = await this.actor.deleteAnalysis(arg0);
@@ -265,73 +265,73 @@ export class Backend implements backendInterface {
             return from_candid_vec_n8(this._uploadFile, this._downloadFile, result);
         }
     }
-    async getAllAnalyses(arg0: bigint, arg1: bigint): Promise<Array<VideoAnalysis>> {
+    async getAllAnalyses(): Promise<Array<VideoAnalysis>> {
         if (this.processError) {
             try {
-                const result = await this.actor.getAllAnalyses(arg0, arg1);
+                const result = await this.actor.getAllAnalyses();
                 return from_candid_vec_n13(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.getAllAnalyses(arg0, arg1);
+            const result = await this.actor.getAllAnalyses();
             return from_candid_vec_n13(this._uploadFile, this._downloadFile, result);
         }
     }
-    async getAnalysis(arg0: bigint): Promise<VideoAnalysis> {
+    async getAnalysis(arg0: bigint): Promise<VideoAnalysis | null> {
         if (this.processError) {
             try {
                 const result = await this.actor.getAnalysis(arg0);
-                return from_candid_VideoAnalysis_n14(this._uploadFile, this._downloadFile, result);
+                return from_candid_opt_n19(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getAnalysis(arg0);
-            return from_candid_VideoAnalysis_n14(this._uploadFile, this._downloadFile, result);
+            return from_candid_opt_n19(this._uploadFile, this._downloadFile, result);
         }
     }
-    async setActivityResults(arg0: bigint, arg1: Array<ActivityResult>): Promise<void> {
+    async setActivityResults(arg0: bigint, arg1: Array<ActivityResult>): Promise<boolean> {
         if (this.processError) {
             try {
-                const result = await this.actor.setActivityResults(arg0, to_candid_vec_n19(this._uploadFile, this._downloadFile, arg1));
+                const result = await this.actor.setActivityResults(arg0, to_candid_vec_n20(this._uploadFile, this._downloadFile, arg1));
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.setActivityResults(arg0, to_candid_vec_n19(this._uploadFile, this._downloadFile, arg1));
+            const result = await this.actor.setActivityResults(arg0, to_candid_vec_n20(this._uploadFile, this._downloadFile, arg1));
             return result;
         }
     }
     async submitVideo(arg0: string, arg1: bigint, arg2: number, arg3: ExternalBlob): Promise<bigint> {
         if (this.processError) {
             try {
-                const result = await this.actor.submitVideo(arg0, arg1, arg2, await to_candid_ExternalBlob_n24(this._uploadFile, this._downloadFile, arg3));
+                const result = await this.actor.submitVideo(arg0, arg1, arg2, await to_candid_ExternalBlob_n25(this._uploadFile, this._downloadFile, arg3));
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.submitVideo(arg0, arg1, arg2, await to_candid_ExternalBlob_n24(this._uploadFile, this._downloadFile, arg3));
+            const result = await this.actor.submitVideo(arg0, arg1, arg2, await to_candid_ExternalBlob_n25(this._uploadFile, this._downloadFile, arg3));
             return result;
         }
     }
-    async updateAnalysisStatus(arg0: bigint, arg1: AnalysisStatus): Promise<void> {
+    async updateAnalysisStatus(arg0: bigint, arg1: AnalysisStatus): Promise<boolean> {
         if (this.processError) {
             try {
-                const result = await this.actor.updateAnalysisStatus(arg0, to_candid_AnalysisStatus_n25(this._uploadFile, this._downloadFile, arg1));
+                const result = await this.actor.updateAnalysisStatus(arg0, to_candid_AnalysisStatus_n26(this._uploadFile, this._downloadFile, arg1));
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.updateAnalysisStatus(arg0, to_candid_AnalysisStatus_n25(this._uploadFile, this._downloadFile, arg1));
+            const result = await this.actor.updateAnalysisStatus(arg0, to_candid_AnalysisStatus_n26(this._uploadFile, this._downloadFile, arg1));
             return result;
         }
     }
@@ -354,6 +354,9 @@ async function from_candid_VideoAnalysis_n14(_uploadFile: (file: ExternalBlob) =
 function from_candid__CaffeineStorageRefillResult_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: __CaffeineStorageRefillResult): _CaffeineStorageRefillResult {
     return from_candid_record_n5(_uploadFile, _downloadFile, value);
 }
+async function from_candid_opt_n19(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_VideoAnalysis]): Promise<VideoAnalysis | null> {
+    return value.length === 0 ? null : await from_candid_VideoAnalysis_n14(_uploadFile, _downloadFile, value[0]);
+}
 function from_candid_opt_n6(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [boolean]): boolean | null {
     return value.length === 0 ? null : value[0];
 }
@@ -361,20 +364,26 @@ function from_candid_opt_n7(_uploadFile: (file: ExternalBlob) => Promise<Uint8Ar
     return value.length === 0 ? null : value[0];
 }
 function from_candid_record_n10(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    id: bigint;
     startTime: number;
     activityLabel: _ActivityLabel;
     endTime: number;
+    analysisId: bigint;
     confidence: number;
 }): {
+    id: bigint;
     startTime: number;
     activityLabel: ActivityLabel;
     endTime: number;
+    analysisId: bigint;
     confidence: number;
 } {
     return {
+        id: value.id,
         startTime: value.startTime,
         activityLabel: from_candid_ActivityLabel_n11(_uploadFile, _downloadFile, value.activityLabel),
         endTime: value.endTime,
+        analysisId: value.analysisId,
         confidence: value.confidence
     };
 }
@@ -382,30 +391,27 @@ async function from_candid_record_n15(_uploadFile: (file: ExternalBlob) => Promi
     id: bigint;
     status: _AnalysisStatus;
     duration: number;
-    video: _ExternalBlob;
-    submittedAt: _Time;
-    submittedBy: Principal;
+    fileBlob: _ExternalBlob;
     fileSize: bigint;
     filename: string;
+    uploadDate: bigint;
 }): Promise<{
     id: bigint;
     status: AnalysisStatus;
     duration: number;
-    video: ExternalBlob;
-    submittedAt: Time;
-    submittedBy: Principal;
+    fileBlob: ExternalBlob;
     fileSize: bigint;
     filename: string;
+    uploadDate: bigint;
 }> {
     return {
         id: value.id,
         status: from_candid_AnalysisStatus_n16(_uploadFile, _downloadFile, value.status),
         duration: value.duration,
-        video: await from_candid_ExternalBlob_n18(_uploadFile, _downloadFile, value.video),
-        submittedAt: value.submittedAt,
-        submittedBy: value.submittedBy,
+        fileBlob: await from_candid_ExternalBlob_n18(_uploadFile, _downloadFile, value.fileBlob),
         fileSize: value.fileSize,
-        filename: value.filename
+        filename: value.filename,
+        uploadDate: value.uploadDate
     };
 }
 function from_candid_record_n5(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
@@ -460,16 +466,16 @@ async function from_candid_vec_n13(_uploadFile: (file: ExternalBlob) => Promise<
 function from_candid_vec_n8(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_ActivityResult>): Array<ActivityResult> {
     return value.map((x)=>from_candid_ActivityResult_n9(_uploadFile, _downloadFile, x));
 }
-function to_candid_ActivityLabel_n22(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: ActivityLabel): _ActivityLabel {
-    return to_candid_variant_n23(_uploadFile, _downloadFile, value);
+function to_candid_ActivityLabel_n23(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: ActivityLabel): _ActivityLabel {
+    return to_candid_variant_n24(_uploadFile, _downloadFile, value);
 }
-function to_candid_ActivityResult_n20(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: ActivityResult): _ActivityResult {
-    return to_candid_record_n21(_uploadFile, _downloadFile, value);
+function to_candid_ActivityResult_n21(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: ActivityResult): _ActivityResult {
+    return to_candid_record_n22(_uploadFile, _downloadFile, value);
 }
-function to_candid_AnalysisStatus_n25(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: AnalysisStatus): _AnalysisStatus {
-    return to_candid_variant_n26(_uploadFile, _downloadFile, value);
+function to_candid_AnalysisStatus_n26(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: AnalysisStatus): _AnalysisStatus {
+    return to_candid_variant_n27(_uploadFile, _downloadFile, value);
 }
-async function to_candid_ExternalBlob_n24(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: ExternalBlob): Promise<_ExternalBlob> {
+async function to_candid_ExternalBlob_n25(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: ExternalBlob): Promise<_ExternalBlob> {
     return await _uploadFile(value);
 }
 function to_candid__CaffeineStorageRefillInformation_n2(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _CaffeineStorageRefillInformation): __CaffeineStorageRefillInformation {
@@ -478,21 +484,27 @@ function to_candid__CaffeineStorageRefillInformation_n2(_uploadFile: (file: Exte
 function to_candid_opt_n1(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _CaffeineStorageRefillInformation | null): [] | [__CaffeineStorageRefillInformation] {
     return value === null ? candid_none() : candid_some(to_candid__CaffeineStorageRefillInformation_n2(_uploadFile, _downloadFile, value));
 }
-function to_candid_record_n21(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function to_candid_record_n22(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    id: bigint;
     startTime: number;
     activityLabel: ActivityLabel;
     endTime: number;
+    analysisId: bigint;
     confidence: number;
 }): {
+    id: bigint;
     startTime: number;
     activityLabel: _ActivityLabel;
     endTime: number;
+    analysisId: bigint;
     confidence: number;
 } {
     return {
+        id: value.id,
         startTime: value.startTime,
-        activityLabel: to_candid_ActivityLabel_n22(_uploadFile, _downloadFile, value.activityLabel),
+        activityLabel: to_candid_ActivityLabel_n23(_uploadFile, _downloadFile, value.activityLabel),
         endTime: value.endTime,
+        analysisId: value.analysisId,
         confidence: value.confidence
     };
 }
@@ -505,7 +517,7 @@ function to_candid_record_n3(_uploadFile: (file: ExternalBlob) => Promise<Uint8A
         proposed_top_up_amount: value.proposed_top_up_amount ? candid_some(value.proposed_top_up_amount) : candid_none()
     };
 }
-function to_candid_variant_n23(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: ActivityLabel): {
+function to_candid_variant_n24(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: ActivityLabel): {
     jumping: null;
 } | {
     clapping: null;
@@ -548,7 +560,7 @@ function to_candid_variant_n23(_uploadFile: (file: ExternalBlob) => Promise<Uint
         smiling: null
     } : value;
 }
-function to_candid_variant_n26(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: AnalysisStatus): {
+function to_candid_variant_n27(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: AnalysisStatus): {
     pending: null;
 } | {
     completed: null;
@@ -567,8 +579,8 @@ function to_candid_variant_n26(_uploadFile: (file: ExternalBlob) => Promise<Uint
         failed: null
     } : value;
 }
-function to_candid_vec_n19(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<ActivityResult>): Array<_ActivityResult> {
-    return value.map((x)=>to_candid_ActivityResult_n20(_uploadFile, _downloadFile, x));
+function to_candid_vec_n20(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<ActivityResult>): Array<_ActivityResult> {
+    return value.map((x)=>to_candid_ActivityResult_n21(_uploadFile, _downloadFile, x));
 }
 export interface CreateActorOptions {
     agent?: Agent;

@@ -32,9 +32,11 @@ export const ActivityLabel = IDL.Variant({
   'smiling' : IDL.Null,
 });
 export const ActivityResult = IDL.Record({
+  'id' : IDL.Nat,
   'startTime' : IDL.Float64,
   'activityLabel' : ActivityLabel,
   'endTime' : IDL.Float64,
+  'analysisId' : IDL.Nat,
   'confidence' : IDL.Float64,
 });
 export const AnalysisStatus = IDL.Variant({
@@ -44,16 +46,14 @@ export const AnalysisStatus = IDL.Variant({
   'failed' : IDL.Null,
 });
 export const ExternalBlob = IDL.Vec(IDL.Nat8);
-export const Time = IDL.Int;
 export const VideoAnalysis = IDL.Record({
   'id' : IDL.Nat,
   'status' : AnalysisStatus,
   'duration' : IDL.Float64,
-  'video' : ExternalBlob,
-  'submittedAt' : Time,
-  'submittedBy' : IDL.Principal,
-  'fileSize' : IDL.Nat64,
+  'fileBlob' : ExternalBlob,
+  'fileSize' : IDL.Nat,
   'filename' : IDL.Text,
+  'uploadDate' : IDL.Int,
 });
 
 export const idlService = IDL.Service({
@@ -83,25 +83,25 @@ export const idlService = IDL.Service({
       [],
     ),
   '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
-  'deleteAnalysis' : IDL.Func([IDL.Nat], [], []),
+  'deleteAnalysis' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'getActivityResults' : IDL.Func(
       [IDL.Nat],
       [IDL.Vec(ActivityResult)],
       ['query'],
     ),
-  'getAllAnalyses' : IDL.Func(
-      [IDL.Nat, IDL.Nat],
-      [IDL.Vec(VideoAnalysis)],
-      ['query'],
+  'getAllAnalyses' : IDL.Func([], [IDL.Vec(VideoAnalysis)], ['query']),
+  'getAnalysis' : IDL.Func([IDL.Nat], [IDL.Opt(VideoAnalysis)], ['query']),
+  'setActivityResults' : IDL.Func(
+      [IDL.Nat, IDL.Vec(ActivityResult)],
+      [IDL.Bool],
+      [],
     ),
-  'getAnalysis' : IDL.Func([IDL.Nat], [VideoAnalysis], ['query']),
-  'setActivityResults' : IDL.Func([IDL.Nat, IDL.Vec(ActivityResult)], [], []),
   'submitVideo' : IDL.Func(
-      [IDL.Text, IDL.Nat64, IDL.Float64, ExternalBlob],
+      [IDL.Text, IDL.Nat, IDL.Float64, ExternalBlob],
       [IDL.Nat],
       [],
     ),
-  'updateAnalysisStatus' : IDL.Func([IDL.Nat, AnalysisStatus], [], []),
+  'updateAnalysisStatus' : IDL.Func([IDL.Nat, AnalysisStatus], [IDL.Bool], []),
 });
 
 export const idlInitArgs = [];
@@ -131,9 +131,11 @@ export const idlFactory = ({ IDL }) => {
     'smiling' : IDL.Null,
   });
   const ActivityResult = IDL.Record({
+    'id' : IDL.Nat,
     'startTime' : IDL.Float64,
     'activityLabel' : ActivityLabel,
     'endTime' : IDL.Float64,
+    'analysisId' : IDL.Nat,
     'confidence' : IDL.Float64,
   });
   const AnalysisStatus = IDL.Variant({
@@ -143,16 +145,14 @@ export const idlFactory = ({ IDL }) => {
     'failed' : IDL.Null,
   });
   const ExternalBlob = IDL.Vec(IDL.Nat8);
-  const Time = IDL.Int;
   const VideoAnalysis = IDL.Record({
     'id' : IDL.Nat,
     'status' : AnalysisStatus,
     'duration' : IDL.Float64,
-    'video' : ExternalBlob,
-    'submittedAt' : Time,
-    'submittedBy' : IDL.Principal,
-    'fileSize' : IDL.Nat64,
+    'fileBlob' : ExternalBlob,
+    'fileSize' : IDL.Nat,
     'filename' : IDL.Text,
+    'uploadDate' : IDL.Int,
   });
   
   return IDL.Service({
@@ -182,25 +182,29 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
-    'deleteAnalysis' : IDL.Func([IDL.Nat], [], []),
+    'deleteAnalysis' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'getActivityResults' : IDL.Func(
         [IDL.Nat],
         [IDL.Vec(ActivityResult)],
         ['query'],
       ),
-    'getAllAnalyses' : IDL.Func(
-        [IDL.Nat, IDL.Nat],
-        [IDL.Vec(VideoAnalysis)],
-        ['query'],
+    'getAllAnalyses' : IDL.Func([], [IDL.Vec(VideoAnalysis)], ['query']),
+    'getAnalysis' : IDL.Func([IDL.Nat], [IDL.Opt(VideoAnalysis)], ['query']),
+    'setActivityResults' : IDL.Func(
+        [IDL.Nat, IDL.Vec(ActivityResult)],
+        [IDL.Bool],
+        [],
       ),
-    'getAnalysis' : IDL.Func([IDL.Nat], [VideoAnalysis], ['query']),
-    'setActivityResults' : IDL.Func([IDL.Nat, IDL.Vec(ActivityResult)], [], []),
     'submitVideo' : IDL.Func(
-        [IDL.Text, IDL.Nat64, IDL.Float64, ExternalBlob],
+        [IDL.Text, IDL.Nat, IDL.Float64, ExternalBlob],
         [IDL.Nat],
         [],
       ),
-    'updateAnalysisStatus' : IDL.Func([IDL.Nat, AnalysisStatus], [], []),
+    'updateAnalysisStatus' : IDL.Func(
+        [IDL.Nat, AnalysisStatus],
+        [IDL.Bool],
+        [],
+      ),
   });
 };
 

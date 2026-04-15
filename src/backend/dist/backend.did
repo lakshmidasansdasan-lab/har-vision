@@ -1,0 +1,71 @@
+type _CaffeineStorageRefillResult = 
+ record {
+   success: opt bool;
+   topped_up_amount: opt nat;
+ };
+type _CaffeineStorageRefillInformation = record {
+                                           proposed_top_up_amount: opt nat;};
+type _CaffeineStorageCreateCertificateResult = 
+ record {
+   blob_hash: text;
+   method: text;
+ };
+type VideoAnalysis = 
+ record {
+   duration: float64;
+   fileBlob: ExternalBlob;
+   fileSize: nat;
+   filename: text;
+   id: nat;
+   status: AnalysisStatus;
+   uploadDate: int;
+ };
+type ExternalBlob = blob;
+type AnalysisStatus = 
+ variant {
+   completed;
+   failed;
+   pending;
+   processing;
+ };
+type ActivityResult = 
+ record {
+   activityLabel: ActivityLabel;
+   analysisId: nat;
+   confidence: float64;
+   endTime: float64;
+   id: nat;
+   startTime: float64;
+ };
+type ActivityLabel = 
+ variant {
+   bending;
+   clapping;
+   jumping;
+   running;
+   sitting;
+   smiling;
+   standing;
+   stretching;
+   walking;
+   waving;
+ };
+service : {
+  _caffeineStorageBlobIsLive: (hash: blob) -> (bool) query;
+  _caffeineStorageBlobsToDelete: () -> (vec blob) query;
+  _caffeineStorageConfirmBlobDeletion: (blobs: vec blob) -> ();
+  _caffeineStorageCreateCertificate: (blobHash: text) ->
+   (_CaffeineStorageCreateCertificateResult);
+  _caffeineStorageRefillCashier: (refillInformation:
+   opt _CaffeineStorageRefillInformation) -> (_CaffeineStorageRefillResult);
+  _caffeineStorageUpdateGatewayPrincipals: () -> ();
+  deleteAnalysis: (id: nat) -> (bool);
+  getActivityResults: (analysisId: nat) -> (vec ActivityResult) query;
+  getAllAnalyses: () -> (vec VideoAnalysis) query;
+  getAnalysis: (id: nat) -> (opt VideoAnalysis) query;
+  setActivityResults: (analysisId: nat, results: vec ActivityResult) ->
+   (bool);
+  submitVideo: (filename: text, fileSize: nat, duration: float64, fileBlob:
+   ExternalBlob) -> (nat);
+  updateAnalysisStatus: (id: nat, status: AnalysisStatus) -> (bool);
+}

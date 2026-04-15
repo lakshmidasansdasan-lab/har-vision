@@ -1,0 +1,23 @@
+{
+  "overview": "HAR Vision is a Human Activity Recognition system that analyzes video to automatically detect and classify human activities like walking, clapping, jumping, and more. Upload a video or use your webcam for real-time detection with confidence scores and visual timelines.",
+  "features": [
+    "Video upload with drag-and-drop (mp4/avi/mov/webm)",
+    "5-step animated analysis pipeline (frame extraction, CNN, pose estimation, temporal analysis, classification)",
+    "Activity results with confidence score bars and color-coded timeline",
+    "Live webcam detection with real-time activity recognition",
+    "Demo mode with pre-seeded results",
+    "Persistent analysis history with delete",
+    "How It Works explainer and use case cards",
+    "Dataset Reference section for 10 HAR benchmark datasets"
+  ],
+  "category": "productivity",
+  "tags": [
+    "computer-vision",
+    "human-activity-recognition",
+    "video-analysis",
+    "machine-learning",
+    "webcam",
+    "deep-learning"
+  ],
+  "last_updated": "2026-04-15T14:08:09.755Z"
+}

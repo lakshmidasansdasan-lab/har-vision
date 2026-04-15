@@ -15,18 +15,29 @@ const stats = [
 export default function HeroSection({ onAnalyzeClick }: HeroSectionProps) {
   return (
     <section className="relative min-h-screen flex flex-col pt-16">
-      {/* Hero image */}
+      {/* Hero banner — CSS gradient replaces missing asset */}
       <div
         className="relative w-full overflow-hidden"
         style={{ height: "400px" }}
       >
-        <img
-          src="/assets/generated/har-hero.dim_1200x400.jpg"
-          alt="HAR Vision - Human Activity Recognition System"
-          className="w-full h-full object-cover"
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(ellipse 120% 80% at 50% 40%, oklch(0.35 0.18 210 / 0.55) 0%, oklch(0.15 0.08 220 / 0.8) 50%, transparent 100%), linear-gradient(160deg, oklch(0.12 0.04 230) 0%, oklch(0.08 0.02 220) 60%, oklch(0.10 0.06 200) 100%)",
+          }}
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-background/30 via-transparent to-background" />
-        <div className="absolute inset-0 bg-gradient-to-r from-background/60 via-transparent to-background/60" />
+        {/* Animated grid lines for sci-fi feel */}
+        <div
+          className="absolute inset-0 opacity-10"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, oklch(0.7 0.2 210) 1px, transparent 1px), linear-gradient(to bottom, oklch(0.7 0.2 210) 1px, transparent 1px)",
+            backgroundSize: "60px 60px",
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background" />
+        <div className="absolute inset-0 bg-gradient-to-r from-background/40 via-transparent to-background/40" />
 
         {/* Overlay text on image */}
         <div className="absolute inset-0 flex items-center justify-center">

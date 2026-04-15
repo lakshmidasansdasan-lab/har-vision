@@ -1,5 +1,5 @@
-import { ActivityLabel } from "../backend";
-import type { ActivityResult } from "../backend.d.ts";
+import { ActivityLabel } from "../types/har";
+import type { ActivityResult } from "../types/har";
 
 export const ACTIVITY_ICONS: Record<ActivityLabel, string> = {
   [ActivityLabel.walking]: "👟",

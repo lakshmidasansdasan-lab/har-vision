@@ -21,9 +21,11 @@ export type ActivityLabel = { 'jumping' : null } |
   { 'running' : null } |
   { 'smiling' : null };
 export interface ActivityResult {
+  'id' : bigint,
   'startTime' : number,
   'activityLabel' : ActivityLabel,
   'endTime' : number,
+  'analysisId' : bigint,
   'confidence' : number,
 }
 export type AnalysisStatus = { 'pending' : null } |
@@ -31,16 +33,14 @@ export type AnalysisStatus = { 'pending' : null } |
   { 'processing' : null } |
   { 'failed' : null };
 export type ExternalBlob = Uint8Array;
-export type Time = bigint;
 export interface VideoAnalysis {
   'id' : bigint,
   'status' : AnalysisStatus,
   'duration' : number,
-  'video' : ExternalBlob,
-  'submittedAt' : Time,
-  'submittedBy' : Principal,
+  'fileBlob' : ExternalBlob,
   'fileSize' : bigint,
   'filename' : string,
+  'uploadDate' : bigint,
 }
 export interface _CaffeineStorageCreateCertificateResult {
   'method' : string,
@@ -69,16 +69,13 @@ export interface _SERVICE {
     _CaffeineStorageRefillResult
   >,
   '_caffeineStorageUpdateGatewayPrincipals' : ActorMethod<[], undefined>,
-  'deleteAnalysis' : ActorMethod<[bigint], undefined>,
+  'deleteAnalysis' : ActorMethod<[bigint], boolean>,
   'getActivityResults' : ActorMethod<[bigint], Array<ActivityResult>>,
-  'getAllAnalyses' : ActorMethod<[bigint, bigint], Array<VideoAnalysis>>,
-  'getAnalysis' : ActorMethod<[bigint], VideoAnalysis>,
-  'setActivityResults' : ActorMethod<
-    [bigint, Array<ActivityResult>],
-    undefined
-  >,
+  'getAllAnalyses' : ActorMethod<[], Array<VideoAnalysis>>,
+  'getAnalysis' : ActorMethod<[bigint], [] | [VideoAnalysis]>,
+  'setActivityResults' : ActorMethod<[bigint, Array<ActivityResult>], boolean>,
   'submitVideo' : ActorMethod<[string, bigint, number, ExternalBlob], bigint>,
-  'updateAnalysisStatus' : ActorMethod<[bigint, AnalysisStatus], undefined>,
+  'updateAnalysisStatus' : ActorMethod<[bigint, AnalysisStatus], boolean>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

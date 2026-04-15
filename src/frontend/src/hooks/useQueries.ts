@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { ActivityResult, VideoAnalysis } from "../backend.d.ts";
-import type { AnalysisStatus } from "../backend.d.ts";
+import type { AnalysisStatus } from "../types/har";
+import type { ActivityResult, VideoAnalysis } from "../types/har";
 import { useActor } from "./useActor";
 
 export function useGetAllAnalyses(page = 0n, pageSize = 20n) {

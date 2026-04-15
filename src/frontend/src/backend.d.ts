@@ -14,22 +14,22 @@ export class ExternalBlob {
     static fromBytes(blob: Uint8Array<ArrayBuffer>): ExternalBlob;
     withUploadProgress(onProgress: (percentage: number) => void): ExternalBlob;
 }
-export type Time = bigint;
 export interface ActivityResult {
+    id: bigint;
     startTime: number;
     activityLabel: ActivityLabel;
     endTime: number;
+    analysisId: bigint;
     confidence: number;
 }
 export interface VideoAnalysis {
     id: bigint;
     status: AnalysisStatus;
     duration: number;
-    video: ExternalBlob;
-    submittedAt: Time;
-    submittedBy: Principal;
+    fileBlob: ExternalBlob;
     fileSize: bigint;
     filename: string;
+    uploadDate: bigint;
 }
 export enum ActivityLabel {
     jumping = "jumping",
@@ -50,11 +50,11 @@ export enum AnalysisStatus {
     failed = "failed"
 }
 export interface backendInterface {
-    deleteAnalysis(id: bigint): Promise<void>;
+    deleteAnalysis(id: bigint): Promise<boolean>;
     getActivityResults(analysisId: bigint): Promise<Array<ActivityResult>>;
-    getAllAnalyses(page: bigint, pageSize: bigint): Promise<Array<VideoAnalysis>>;
-    getAnalysis(id: bigint): Promise<VideoAnalysis>;
-    setActivityResults(analysisId: bigint, results: Array<ActivityResult>): Promise<void>;
-    submitVideo(filename: string, fileSize: bigint, duration: number, video: ExternalBlob): Promise<bigint>;
-    updateAnalysisStatus(id: bigint, status: AnalysisStatus): Promise<void>;
+    getAllAnalyses(): Promise<Array<VideoAnalysis>>;
+    getAnalysis(id: bigint): Promise<VideoAnalysis | null>;
+    setActivityResults(analysisId: bigint, results: Array<ActivityResult>): Promise<boolean>;
+    submitVideo(filename: string, fileSize: bigint, duration: number, fileBlob: ExternalBlob): Promise<bigint>;
+    updateAnalysisStatus(id: bigint, status: AnalysisStatus): Promise<boolean>;
 }

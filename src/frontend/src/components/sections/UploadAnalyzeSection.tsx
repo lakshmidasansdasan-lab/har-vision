@@ -2,10 +2,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  Brain,
   CheckCircle2,
+  Clock,
   FileVideo,
+  Layers,
   Loader2,
   Play,
+  Scan,
   Upload,
   Video,
   X,
@@ -14,19 +18,58 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
-import { ActivityLabel, AnalysisStatus, ExternalBlob } from "../../backend";
-import type { ActivityResult } from "../../backend.d.ts";
+import { ExternalBlob } from "../../backend";
 import { useActor } from "../../hooks/useActor";
+import { ActivityLabel, AnalysisStatus } from "../../types/har";
+import type { ActivityResult } from "../../types/har";
 import { DEMO_RESULTS, formatFileSize } from "../../utils/activityUtils";
 import ResultsPanel from "../ResultsPanel";
 import WebcamDetectionSection from "../WebcamDetectionSection";
 
-const PROCESSING_STEPS = [
-  { label: "Extracting frames...", duration: 1500 },
-  { label: "Running CNN feature extraction...", duration: 2000 },
-  { label: "Analyzing pose keypoints...", duration: 2000 },
-  { label: "Classifying activities...", duration: 1500 },
-  { label: "Generating results...", duration: 1000 },
+interface ProcessingStep {
+  id: string;
+  label: string;
+  sublabel: string;
+  icon: React.ReactNode;
+  duration: number;
+}
+
+const PROCESSING_STEPS: ProcessingStep[] = [
+  {
+    id: "frames",
+    label: "Frame Extraction",
+    sublabel: "Sampling video at 30fps intervals",
+    icon: <Layers className="w-4 h-4" />,
+    duration: 1500,
+  },
+  {
+    id: "cnn",
+    label: "CNN Analysis",
+    sublabel: "Running ResNet-50 feature extraction",
+    icon: <Brain className="w-4 h-4" />,
+    duration: 2000,
+  },
+  {
+    id: "pose",
+    label: "Pose Estimation",
+    sublabel: "Detecting 17 skeletal keypoints per frame",
+    icon: <Scan className="w-4 h-4" />,
+    duration: 2000,
+  },
+  {
+    id: "temporal",
+    label: "Temporal Analysis",
+    sublabel: "Building motion sequences with LSTM",
+    icon: <Clock className="w-4 h-4" />,
+    duration: 1500,
+  },
+  {
+    id: "classify",
+    label: "Classification",
+    sublabel: "Mapping sequences to activity labels",
+    icon: <Zap className="w-4 h-4" />,
+    duration: 1000,
+  },
 ];
 
 interface SelectedFile {
@@ -39,8 +82,19 @@ interface SelectedFile {
 type AnalysisState =
   | { stage: "idle" }
   | { stage: "file-selected"; selected: SelectedFile }
-  | { stage: "processing"; currentStep: number; analysisId: bigint }
-  | { stage: "completed"; results: ActivityResult[]; analysisId: bigint };
+  | {
+      stage: "processing";
+      currentStep: number;
+      stepProgress: number;
+      analysisId: bigint;
+    }
+  | {
+      stage: "completed";
+      results: ActivityResult[];
+      analysisId: bigint;
+      filename: string;
+      duration: number;
+    };
 
 function estimateDuration(file: File): Promise<number> {
   return new Promise((resolve) => {
@@ -49,7 +103,12 @@ function estimateDuration(file: File): Promise<number> {
     const url = URL.createObjectURL(file);
     video.onloadedmetadata = () => {
       URL.revokeObjectURL(url);
-      resolve(Number.isFinite(video.duration) ? video.duration : 30);
+      resolve(
+        Number.isFinite(video.duration) &&
+          video.duration !== Number.POSITIVE_INFINITY
+          ? video.duration
+          : 30,
+      );
     };
     video.onerror = () => {
       URL.revokeObjectURL(url);
@@ -68,7 +127,6 @@ function generateMockResults(duration: number): ActivityResult[] {
     ActivityLabel.clapping,
     ActivityLabel.jumping,
   ];
-
   const results: ActivityResult[] = [];
   let currentTime = 0;
   const segmentCount = Math.max(3, Math.min(6, Math.floor(duration / 5)));
@@ -93,7 +151,6 @@ function generateMockResults(duration: number): ActivityResult[] {
     });
     currentTime = endTime;
   }
-
   return results;
 }
 
@@ -110,23 +167,18 @@ export default function UploadAnalyzeSection() {
   const handleFileSelect = useCallback(async (file: File) => {
     const allowedExtensions = [".mp4", ".avi", ".mov", ".webm"];
     const ext = file.name.toLowerCase().slice(file.name.lastIndexOf("."));
-
     if (!allowedExtensions.includes(ext) && !file.type.startsWith("video/")) {
-      toast.error(
-        "Unsupported file format. Please upload MP4, AVI, MOV, or WebM videos.",
-      );
+      toast.error("Unsupported format. Please upload MP4, AVI, MOV, or WebM.");
       return;
     }
-
+    if (file.size > 500 * 1024 * 1024) {
+      toast.error("File too large. Maximum size is 500MB.");
+      return;
+    }
     const duration = await estimateDuration(file);
     setState({
       stage: "file-selected",
-      selected: {
-        file,
-        name: file.name,
-        size: BigInt(file.size),
-        duration,
-      },
+      selected: { file, name: file.name, size: BigInt(file.size), duration },
     });
   }, []);
 
@@ -140,21 +192,24 @@ export default function UploadAnalyzeSection() {
     [handleFileSelect],
   );
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(true);
-  };
+  const runProcessingSteps = async (speedMultiplier: number) => {
+    for (let i = 0; i < PROCESSING_STEPS.length; i++) {
+      const stepDuration = PROCESSING_STEPS[i].duration * speedMultiplier;
+      const tickMs = 50;
+      const ticks = Math.floor(stepDuration / tickMs);
 
-  const handleDragLeave = () => setIsDragOver(false);
-
-  const runProcessingSteps = async (startStep = 0, speedMultiplier = 1) => {
-    for (let i = startStep; i < PROCESSING_STEPS.length; i++) {
-      setState((prev) =>
-        prev.stage === "processing" ? { ...prev, currentStep: i } : prev,
-      );
-      await new Promise<void>((r) =>
-        setTimeout(r, PROCESSING_STEPS[i].duration * speedMultiplier),
-      );
+      for (let t = 0; t <= ticks; t++) {
+        setState((prev) =>
+          prev.stage === "processing"
+            ? {
+                ...prev,
+                currentStep: i,
+                stepProgress: Math.min(100, Math.round((t / ticks) * 100)),
+              }
+            : prev,
+        );
+        await new Promise<void>((r) => setTimeout(r, tickMs));
+      }
     }
   };
 
@@ -167,14 +222,12 @@ export default function UploadAnalyzeSection() {
       const arrayBuffer = await selected.file.arrayBuffer();
       const bytes = new Uint8Array(arrayBuffer) as Uint8Array<ArrayBuffer>;
       const externalBlob = ExternalBlob.fromBytes(bytes);
-
       analysisId = await actor.submitVideo(
         selected.name,
         selected.size,
         selected.duration,
         externalBlob,
       );
-
       await actor.updateAnalysisStatus(analysisId, AnalysisStatus.processing);
     } catch (err) {
       toast.error("Failed to submit video. Please try again.");
@@ -182,8 +235,13 @@ export default function UploadAnalyzeSection() {
       return;
     }
 
-    setState({ stage: "processing", currentStep: 0, analysisId });
-    await runProcessingSteps(0, 1);
+    setState({
+      stage: "processing",
+      currentStep: 0,
+      stepProgress: 0,
+      analysisId,
+    });
+    await runProcessingSteps(1);
 
     const results = generateMockResults(selected.duration);
 
@@ -195,9 +253,15 @@ export default function UploadAnalyzeSection() {
       toast.error("Failed to save analysis results.");
     }
 
-    setState({ stage: "completed", results, analysisId });
+    setState({
+      stage: "completed",
+      results,
+      analysisId,
+      filename: selected.name,
+      duration: selected.duration,
+    });
     queryClient.invalidateQueries({ queryKey: ["analyses"] });
-    toast.success("Analysis complete!");
+    toast.success("Analysis complete! Activities detected.");
   };
 
   const loadDemo = async () => {
@@ -227,8 +291,13 @@ export default function UploadAnalyzeSection() {
       return;
     }
 
-    setState({ stage: "processing", currentStep: 0, analysisId });
-    await runProcessingSteps(0, 0.5);
+    setState({
+      stage: "processing",
+      currentStep: 0,
+      stepProgress: 0,
+      analysisId,
+    });
+    await runProcessingSteps(0.4);
 
     try {
       await actor.setActivityResults(analysisId, DEMO_RESULTS);
@@ -237,15 +306,30 @@ export default function UploadAnalyzeSection() {
       console.error(err);
     }
 
-    setState({ stage: "completed", results: DEMO_RESULTS, analysisId });
+    setState({
+      stage: "completed",
+      results: DEMO_RESULTS,
+      analysisId,
+      filename: fakeName,
+      duration: fakeDuration,
+    });
     queryClient.invalidateQueries({ queryKey: ["analyses"] });
     toast.success("Demo analysis complete!");
   };
 
   const reset = () => setState({ stage: "idle" });
 
+  const overallProgress =
+    state.stage === "processing"
+      ? Math.round(
+          ((state.currentStep * 100 + state.stepProgress) /
+            (PROCESSING_STEPS.length * 100)) *
+            100,
+        )
+      : 0;
+
   return (
-    <section className="py-20 px-4 sm:px-6">
+    <section className="py-20 px-4 sm:px-6" data-ocid="upload.section">
       <div className="container mx-auto max-w-4xl">
         {/* Section header */}
         <motion.div
@@ -338,20 +422,23 @@ export default function UploadAnalyzeSection() {
                     exit={{ opacity: 0, y: -20 }}
                     transition={{ duration: 0.4 }}
                   >
-                    {/* Drop zone */}
                     <label
                       htmlFor="video-upload"
+                      data-ocid="upload.dropzone"
                       onDrop={handleDrop}
-                      onDragOver={handleDragOver}
-                      onDragLeave={handleDragLeave}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setIsDragOver(true);
+                      }}
+                      onDragLeave={() => setIsDragOver(false)}
                       className={`
-                        relative border-2 border-dashed rounded-xl p-10 text-center transition-all block
+                        relative border-2 border-dashed rounded-xl p-10 text-center transition-all duration-300 block
                         ${state.stage === "idle" ? "cursor-pointer" : "cursor-default"}
                         ${
                           isDragOver
                             ? "border-primary bg-primary/10 glow-border-cyan"
                             : state.stage === "file-selected"
-                              ? "border-primary/50 bg-primary/5"
+                              ? "border-primary/50 bg-primary/5 glow-border-cyan"
                               : "border-border hover:border-primary/50 hover:bg-primary/5"
                         }
                       `}
@@ -367,6 +454,7 @@ export default function UploadAnalyzeSection() {
                           const file = e.target.files?.[0];
                           if (file) handleFileSelect(file);
                         }}
+                        data-ocid="upload.input"
                       />
 
                       <AnimatePresence mode="wait">
@@ -384,7 +472,7 @@ export default function UploadAnalyzeSection() {
                               Drop your video here
                             </h3>
                             <p className="text-muted-foreground text-sm mb-1">
-                              Supported formats: MP4, AVI, MOV, WebM
+                              Supported: MP4, AVI, MOV, WebM — max 500MB
                             </p>
                             <p className="text-muted-foreground/60 text-xs">
                               or click to browse files
@@ -405,6 +493,8 @@ export default function UploadAnalyzeSection() {
                                 reset();
                               }}
                               className="absolute top-0 right-0 text-muted-foreground hover:text-foreground transition-colors"
+                              data-ocid="upload.clear_button"
+                              aria-label="Remove selected file"
                             >
                               <X className="w-5 h-5" />
                             </button>
@@ -444,6 +534,7 @@ export default function UploadAnalyzeSection() {
                         <Button
                           size="lg"
                           onClick={startAnalysis}
+                          data-ocid="upload.start_button"
                           className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 glow-cyan font-display font-semibold"
                         >
                           <Zap className="mr-2 w-4 h-4" />
@@ -454,6 +545,7 @@ export default function UploadAnalyzeSection() {
                         size="lg"
                         variant="outline"
                         onClick={loadDemo}
+                        data-ocid="upload.demo_button"
                         className={`border-primary/40 text-primary hover:bg-primary/10 hover:border-primary/60 font-display font-semibold ${
                           state.stage === "file-selected" ? "" : "w-full"
                         }`}
@@ -473,101 +565,150 @@ export default function UploadAnalyzeSection() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
                     transition={{ duration: 0.4 }}
+                    data-ocid="upload.loading_state"
                   >
                     <Card className="glass-surface border-primary/20 glow-border-cyan">
                       <CardContent className="p-8">
                         <div className="text-center mb-8">
-                          <div className="w-16 h-16 rounded-2xl bg-primary/15 border border-primary/30 flex items-center justify-center mx-auto mb-4">
+                          <div className="relative w-16 h-16 rounded-2xl bg-primary/15 border border-primary/30 flex items-center justify-center mx-auto mb-4">
                             <Loader2 className="w-7 h-7 text-primary animate-spin" />
+                            <div className="absolute inset-0 rounded-2xl glow-cyan opacity-50" />
                           </div>
-                          <h3 className="font-display font-bold text-xl text-foreground mb-2">
+                          <h3 className="font-display font-bold text-xl text-foreground mb-1">
                             Analyzing Video
                           </h3>
                           <p className="text-muted-foreground text-sm">
-                            AI pipeline is processing your video...
+                            AI pipeline processing — {overallProgress}% complete
                           </p>
                         </div>
 
-                        <div className="space-y-3 max-w-md mx-auto">
+                        {/* Overall progress */}
+                        <div className="max-w-md mx-auto mb-6">
+                          <div className="h-2 rounded-full bg-muted overflow-hidden">
+                            <motion.div
+                              className="h-full rounded-full bg-primary"
+                              animate={{ width: `${overallProgress}%` }}
+                              transition={{ duration: 0.3 }}
+                              style={{
+                                boxShadow:
+                                  "0 0 12px oklch(0.75 0.20 195 / 0.6)",
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Steps */}
+                        <div className="space-y-2 max-w-md mx-auto">
                           {PROCESSING_STEPS.map((step, idx) => {
                             const isActive = idx === state.currentStep;
                             const isDone = idx < state.currentStep;
+                            const progress = isActive
+                              ? state.stepProgress
+                              : isDone
+                                ? 100
+                                : 0;
 
                             return (
                               <motion.div
-                                key={step.label}
+                                key={step.id}
                                 initial={{ opacity: 0, x: -10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: idx * 0.1 }}
-                                className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
+                                animate={{
+                                  opacity: isDone || isActive ? 1 : 0.35,
+                                  x: 0,
+                                }}
+                                transition={{ delay: idx * 0.08 }}
+                                className={`rounded-lg overflow-hidden transition-all duration-300 ${
                                   isActive
-                                    ? "bg-primary/10 border border-primary/30"
-                                    : isDone
-                                      ? "bg-muted/50"
-                                      : "opacity-40"
+                                    ? "border border-primary/40 bg-primary/8"
+                                    : ""
                                 }`}
                               >
-                                <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0">
-                                  {isDone ? (
-                                    <CheckCircle2 className="w-5 h-5 text-primary" />
-                                  ) : isActive ? (
-                                    <Loader2 className="w-5 h-5 text-primary animate-spin" />
-                                  ) : (
-                                    <div className="w-5 h-5 rounded-full border-2 border-border" />
-                                  )}
-                                </div>
-                                <span
-                                  className={`text-sm font-mono ${
-                                    isActive
-                                      ? "text-primary"
-                                      : isDone
-                                        ? "text-muted-foreground"
-                                        : "text-muted-foreground/50"
-                                  }`}
+                                <div
+                                  className={`flex items-center gap-3 px-3 py-2.5 ${isActive ? "bg-primary/5" : ""}`}
                                 >
-                                  {step.label}
-                                </span>
-                                {isDone && (
-                                  <span className="ml-auto text-xs text-primary/60 font-mono">
-                                    DONE
-                                  </span>
+                                  <div
+                                    className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
+                                      isDone
+                                        ? "bg-primary/20 text-primary"
+                                        : isActive
+                                          ? "bg-primary/20 text-primary"
+                                          : "bg-muted/50 text-muted-foreground"
+                                    }`}
+                                  >
+                                    {isDone ? (
+                                      <CheckCircle2 className="w-4 h-4" />
+                                    ) : isActive ? (
+                                      <motion.div
+                                        animate={{ rotate: 360 }}
+                                        transition={{
+                                          duration: 1.5,
+                                          repeat: Number.POSITIVE_INFINITY,
+                                          ease: "linear",
+                                        }}
+                                      >
+                                        {step.icon}
+                                      </motion.div>
+                                    ) : (
+                                      step.icon
+                                    )}
+                                  </div>
+
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span
+                                        className={`text-sm font-mono font-semibold truncate ${
+                                          isActive
+                                            ? "text-primary"
+                                            : isDone
+                                              ? "text-foreground/70"
+                                              : "text-muted-foreground/50"
+                                        }`}
+                                      >
+                                        {step.label}
+                                      </span>
+                                      {isDone && (
+                                        <span className="text-xs font-mono text-primary/60 flex-shrink-0">
+                                          DONE
+                                        </span>
+                                      )}
+                                      {isActive && (
+                                        <span className="text-xs font-mono text-primary flex-shrink-0">
+                                          {state.stepProgress}%
+                                        </span>
+                                      )}
+                                    </div>
+                                    {isActive && (
+                                      <p className="text-xs text-muted-foreground/70 font-mono truncate mt-0.5">
+                                        {step.sublabel}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Per-step progress bar */}
+                                {(isActive || isDone) && (
+                                  <div className="h-0.5 bg-muted/50">
+                                    <motion.div
+                                      className="h-full bg-primary/60"
+                                      animate={{ width: `${progress}%` }}
+                                      transition={{ duration: 0.1 }}
+                                    />
+                                  </div>
                                 )}
                               </motion.div>
                             );
                           })}
                         </div>
 
-                        {/* Progress bar */}
-                        <div className="mt-6 max-w-md mx-auto">
-                          <div className="flex justify-between text-xs text-muted-foreground mb-2">
-                            <span className="font-mono">Progress</span>
-                            <span className="font-mono">
-                              {Math.round(
-                                ((state.currentStep + 1) /
-                                  PROCESSING_STEPS.length) *
-                                  100,
-                              )}
-                              %
-                            </span>
-                          </div>
-                          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                            <motion.div
-                              className="h-full rounded-full bg-primary"
-                              animate={{
-                                width: `${
-                                  ((state.currentStep + 1) /
-                                    PROCESSING_STEPS.length) *
-                                  100
-                                }%`,
-                              }}
-                              transition={{ duration: 0.5 }}
-                              style={{
-                                boxShadow:
-                                  "0 0 10px oklch(0.75 0.20 195 / 0.5)",
-                              }}
-                            />
-                          </div>
-                        </div>
+                        {/* Step counter */}
+                        <p className="text-center text-xs text-muted-foreground font-mono mt-5">
+                          Step{" "}
+                          {Math.min(
+                            state.currentStep + 1,
+                            PROCESSING_STEPS.length,
+                          )}{" "}
+                          of {PROCESSING_STEPS.length}
+                        </p>
                       </CardContent>
                     </Card>
                   </motion.div>
@@ -581,11 +722,14 @@ export default function UploadAnalyzeSection() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.5 }}
+                    data-ocid="upload.success_state"
                   >
                     <ResultsPanel
                       results={state.results}
                       analysisId={state.analysisId}
                       onReset={reset}
+                      filename={state.filename}
+                      duration={state.duration}
                     />
                   </motion.div>
                 )}

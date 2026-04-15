@@ -1,30 +1,25 @@
-import Array "mo:core/Array";
-import Iter "mo:core/Iter";
 import Map "mo:core/Map";
-import Order "mo:core/Order";
-import Text "mo:core/Text";
-import Runtime "mo:core/Runtime";
+
 import Time "mo:core/Time";
 import Nat "mo:core/Nat";
-import Nat64 "mo:core/Nat64";
-import Float "mo:core/Float";
+import Order "mo:core/Order";
 import List "mo:core/List";
-import MixinStorage "blob-storage/Mixin";
-import Storage "blob-storage/Storage";
-import Principal "mo:core/Principal";
+import Cycles "mo:core/Cycles";
+import Prim "mo:prim";
+
 
 actor {
-  include MixinStorage();
+  type ExternalBlob = Blob;
 
   type ActivityLabel = {
-    #clapping;
-    #standing;
-    #smiling;
     #walking;
     #running;
+    #clapping;
     #waving;
     #jumping;
     #sitting;
+    #standing;
+    #smiling;
     #bending;
     #stretching;
   };
@@ -37,6 +32,8 @@ actor {
   };
 
   type ActivityResult = {
+    id : Nat;
+    analysisId : Nat;
     activityLabel : ActivityLabel;
     confidence : Float;
     startTime : Float;
@@ -46,101 +43,146 @@ actor {
   type VideoAnalysis = {
     id : Nat;
     filename : Text;
-    fileSize : Nat64;
+    fileSize : Nat;
     duration : Float;
+    uploadDate : Int;
     status : AnalysisStatus;
-    submittedBy : Principal;
-    submittedAt : Time.Time;
-    video : Storage.ExternalBlob;
+    fileBlob : ExternalBlob;
   };
 
   var nextAnalysisId = 0;
   let videoAnalyses = Map.empty<Nat, VideoAnalysis>();
-  let activityResults = Map.empty<Nat, List.List<ActivityResult>>();
+  let activityResultsMap = Map.empty<Nat, List.List<ActivityResult>>();
 
-  module VideoAnalysis {
-    public func compare(a : VideoAnalysis, b : VideoAnalysis) : Order.Order {
-      Nat.compare(b.id, a.id);
-    };
-  };
-
-  public shared ({ caller }) func submitVideo(filename : Text, fileSize : Nat64, duration : Float, video : Storage.ExternalBlob) : async Nat {
+  public shared ({ caller = _ }) func submitVideo(
+    filename : Text,
+    fileSize : Nat,
+    duration : Float,
+    fileBlob : ExternalBlob,
+  ) : async Nat {
+    let id = nextAnalysisId;
     let analysis : VideoAnalysis = {
-      id = nextAnalysisId;
+      id;
       filename;
       fileSize;
       duration;
+      uploadDate = Time.now();
       status = #pending;
-      submittedBy = caller;
-      submittedAt = Time.now();
-      video;
+      fileBlob;
     };
-
-    videoAnalyses.add(nextAnalysisId, analysis);
-    let resultsList = List.empty<ActivityResult>();
-    activityResults.add(nextAnalysisId, resultsList);
-
+    videoAnalyses.add(id, analysis);
+    activityResultsMap.add(id, List.empty<ActivityResult>());
     nextAnalysisId += 1;
-    analysis.id;
+    id;
   };
 
-  public query ({ caller }) func getAnalysis(id : Nat) : async VideoAnalysis {
-    switch (videoAnalyses.get(id)) {
-      case (null) { Runtime.trap("Analysis not found") };
-      case (?analysis) { analysis };
-    };
+  public query ({ caller = _ }) func getAnalysis(id : Nat) : async ?VideoAnalysis {
+    videoAnalyses.get(id);
   };
 
-  public query ({ caller }) func getAllAnalyses(page : Nat, pageSize : Nat) : async [VideoAnalysis] {
-    let analyses = videoAnalyses.values().toArray();
-    let analysesArray = analyses.sort();
-
-    let start = page * pageSize;
-    let end = Nat.min(start + pageSize, analysesArray.size());
-
-    analysesArray.sliceToArray(start, end);
+  public query ({ caller = _ }) func getAllAnalyses() : async [VideoAnalysis] {
+    videoAnalyses.reverseEntries().map<(Nat, VideoAnalysis), VideoAnalysis>(func((_, v)) = v).toArray();
   };
 
-  public shared ({ caller }) func deleteAnalysis(id : Nat) : async () {
+  public shared ({ caller = _ }) func deleteAnalysis(id : Nat) : async Bool {
     if (not videoAnalyses.containsKey(id)) {
-      Runtime.trap("Analysis not found");
+      return false;
     };
     videoAnalyses.remove(id);
-    activityResults.remove(id);
+    activityResultsMap.remove(id);
+    true;
   };
 
-  public shared ({ caller }) func updateAnalysisStatus(id : Nat, status : AnalysisStatus) : async () {
+  public shared ({ caller = _ }) func updateAnalysisStatus(id : Nat, status : AnalysisStatus) : async Bool {
     switch (videoAnalyses.get(id)) {
-      case (null) { Runtime.trap("Analysis not found") };
+      case (null) { false };
       case (?analysis) {
-        let updatedAnalysis : VideoAnalysis = {
-          id = analysis.id;
-          filename = analysis.filename;
-          fileSize = analysis.fileSize;
-          duration = analysis.duration;
-          status;
-          submittedBy = analysis.submittedBy;
-          submittedAt = analysis.submittedAt;
-          video = analysis.video;
-        };
-        videoAnalyses.add(id, updatedAnalysis);
+        videoAnalyses.add(id, { analysis with status });
+        true;
       };
     };
   };
 
-  public query ({ caller }) func getActivityResults(analysisId : Nat) : async [ActivityResult] {
-    switch (activityResults.get(analysisId)) {
-      case (null) { Runtime.trap("Analysis not found") };
+  public query ({ caller = _ }) func getActivityResults(analysisId : Nat) : async [ActivityResult] {
+    switch (activityResultsMap.get(analysisId)) {
+      case (null) { [] };
       case (?results) { results.toArray() };
     };
   };
 
-  public shared ({ caller }) func setActivityResults(analysisId : Nat, results : [ActivityResult]) : async () {
+  public shared ({ caller = _ }) func setActivityResults(analysisId : Nat, results : [ActivityResult]) : async Bool {
     if (not videoAnalyses.containsKey(analysisId)) {
-      Runtime.trap("Analysis not found");
+      return false;
+    };
+    activityResultsMap.add(analysisId, List.fromArray<ActivityResult>(results));
+    true;
+  };
+
+  // Object storage support functions
+  type _CaffeineStorageRefillInformation = {
+    proposed_top_up_amount : ?Nat;
+  };
+
+  type _CaffeineStorageRefillResult = {
+    success : ?Bool;
+    topped_up_amount : ?Nat;
+  };
+
+  type _CaffeineStorageCreateCertificateResult = {
+    method : Text;
+    blob_hash : Text;
+  };
+
+  public shared ({ caller }) func _caffeineStorageRefillCashier(refillInformation : ?_CaffeineStorageRefillInformation) : async _CaffeineStorageRefillResult {
+    let currentBalance = Cycles.balance();
+    let reservedCycles : Nat = 400_000_000_000;
+    let currentFreeCycles : Nat = if (currentBalance > reservedCycles) { currentBalance - reservedCycles } else { 0 };
+
+    let cyclesToSend : Nat = switch (refillInformation) {
+      case (null) { currentFreeCycles };
+      case (?info) {
+        switch (info.proposed_top_up_amount) {
+          case (null) { currentFreeCycles };
+          case (?proposed) { Nat.min(proposed, currentFreeCycles) };
+        };
+      };
     };
 
-    let resultsList = List.fromArray<ActivityResult>(results);
-    activityResults.add(analysisId, resultsList);
+    let cashierActor = actor (caller.toText()) : actor {
+      account_top_up_v1 : ({ account : Principal }) -> async ();
+    };
+
+    await (with cycles = cyclesToSend) cashierActor.account_top_up_v1({
+      account = Prim.getSelfPrincipal<system>();
+    });
+
+    { success = ?true; topped_up_amount = ?cyclesToSend };
+  };
+
+  public shared ({ caller = _ }) func _caffeineStorageUpdateGatewayPrincipals() : async () {
+    // No-op: gateway principals managed externally
+  };
+
+  public query ({ caller = _ }) func _caffeineStorageBlobIsLive(hash : Blob) : async Bool {
+    Prim.isStorageBlobLive(hash);
+  };
+
+  public query ({ caller = _ }) func _caffeineStorageBlobsToDelete() : async [Blob] {
+    let deadBlobs = Prim.getDeadBlobs();
+    switch (deadBlobs) {
+      case (null) { [] };
+      case (?blobs) { blobs.sliceToArray(0, 10000) };
+    };
+  };
+
+  public shared ({ caller = _ }) func _caffeineStorageConfirmBlobDeletion(blobs : [Blob]) : async () {
+    Prim.pruneConfirmedDeadBlobs(blobs);
+    type GC = actor { __motoko_gc_trigger : () -> async () };
+    let myGC = actor (debug_show (Prim.getSelfPrincipal<system>())) : GC;
+    await myGC.__motoko_gc_trigger();
+  };
+
+  public shared ({ caller = _ }) func _caffeineStorageCreateCertificate(blobHash : Text) : async _CaffeineStorageCreateCertificateResult {
+    { method = "upload"; blob_hash = blobHash };
   };
 };

@@ -5,11 +5,13 @@ import { motion } from "motion/react";
 interface NavBarProps {
   onScrollToUpload: () => void;
   onScrollToHistory: () => void;
+  onScrollToDatasets: () => void;
 }
 
 export default function NavBar({
   onScrollToUpload,
   onScrollToHistory,
+  onScrollToDatasets,
 }: NavBarProps) {
   return (
     <motion.header
@@ -36,6 +38,7 @@ export default function NavBar({
         <nav className="hidden md:flex items-center gap-6">
           <button
             type="button"
+            data-ocid="nav.analyze_link"
             onClick={onScrollToUpload}
             className="text-sm text-muted-foreground hover:text-primary transition-colors"
           >
@@ -43,6 +46,7 @@ export default function NavBar({
           </button>
           <button
             type="button"
+            data-ocid="nav.how_it_works_link"
             onClick={() =>
               document
                 .getElementById("how-it-works")
@@ -54,6 +58,15 @@ export default function NavBar({
           </button>
           <button
             type="button"
+            data-ocid="nav.datasets_link"
+            onClick={onScrollToDatasets}
+            className="text-sm text-muted-foreground hover:text-primary transition-colors"
+          >
+            Datasets
+          </button>
+          <button
+            type="button"
+            data-ocid="nav.history_link"
             onClick={onScrollToHistory}
             className="text-sm text-muted-foreground hover:text-primary transition-colors"
           >
@@ -64,6 +77,7 @@ export default function NavBar({
         <Button
           size="sm"
           onClick={onScrollToUpload}
+          data-ocid="nav.start_analysis_button"
           className="bg-primary/20 text-primary border border-primary/40 hover:bg-primary/30 hover:border-primary/60 transition-all glow-border-cyan text-xs font-mono tracking-wider"
         >
           START ANALYSIS
